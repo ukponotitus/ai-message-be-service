@@ -1,0 +1,1 @@
+web: gunicorn ai_message_be_service.wsgi
