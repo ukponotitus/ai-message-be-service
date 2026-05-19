@@ -25,3 +25,13 @@ class Message(models.Model):
 
     def __str__(self):
         return f"[{self.role}] {self.contact.phone}: {self.content[:50]}"
+
+class CompanyInfo(models.Model):
+    key = models.CharField(max_length=100, help_text="e.g., pricing, location, services")
+    content = models.TextField(help_text="The actual details the AI should know")
+
+    def __str__(self):
+        return self.key
+
+    class Meta:
+        verbose_name_plural = "Company Info"

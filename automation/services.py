@@ -2,6 +2,8 @@ import requests
 from groq import Groq
 from django.conf import settings
 from .models import Contact, Message
+from .models import Contact, Message, CompanyInfo
+
 
 
 def get_or_create_contact(phone: str, name: str = "") -> Contact:
@@ -16,18 +18,22 @@ def build_conversation_history(contact: Contact) -> list:
     history = list(contact.messages.order_by("-created_at")[:20])
     history.reverse()
 
-    knowledge_base = (
-        "You are Titus, the lead assistant for Automate NG. "
-        "COMPANY DETAILS: "
-        "- Location: Based in Ikot Ekpene Akwa Ibom State, Nigeria. "
-        "- Pricing: Basic Auto-reply setup is NGN 200,000. Complex systems start at NGN 500,000. "
-        "- Services: WhatsApp automation, API integration, and custom CRM workflows. "
-        "- Personality: Professional, friendly, and uses Nigerian business etiquette. "
-        "If you don't know an answer, ask the user to wait for a human agent."
+    info_items = CompanyInfo.objects.all()
+    data_bank = "\n".join([f"- {item.key}: {item.content}" for item in info_items])
+
+    system_prompt = (
+        "You are Uforo, an assistant working for Titus at Automate NG. "
+        "WHO WE ARE: Automate NG specializes in building Custom AI Brains for businesses. "
+        "OUR DATA BANK:\n"
+        f"{data_bank}\n\n"
+        "GUIDELINES:\n"
+        "1. If a user asks for a specific 'Brain' or 'Automation' for their niche (like Real Estate, Legal, or Health), "
+        "DO NOT say we don't offer it. Instead, explain that we build CUSTOM SOLUTIONS for that niche starting at NGN 300,000. "
+        "2. Personality: Professional, warm, and helpful. Use Nigerian business etiquette (respectful but modern). "
+        "3. Focus: Always try to lead the user toward booking a consultation or speaking with a human expert (Titus) for a custom quote."
     )
 
-    messages = [{"role": "system", "content": knowledge_base}]
-
+    messages = [{"role": "system", "content": system_prompt}]
     for msg in history:
         messages.append({"role": msg.role, "content": msg.content})
 
