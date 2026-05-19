@@ -78,8 +78,6 @@ TEMPLATES = [
     },
 ]
 
-WSGI_APPLICATION = 'ai_message_be_service.wsgi.application'
-
 
 # Database
 # https://docs.djangoproject.com/en/4.2/ref/settings/#databases
