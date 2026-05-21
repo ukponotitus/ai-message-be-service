@@ -3,6 +3,7 @@ from groq import Groq
 from django.conf import settings
 from .models import Contact, Message
 from .models import Contact, Message, CompanyInfo
+import time
 
 
 
@@ -13,7 +14,6 @@ def get_or_create_contact(phone: str, name: str = "") -> Contact:
         contact.save(update_fields=["name"])
     return contact
 
-
 def build_conversation_history(contact: Contact) -> list:
     history = list(contact.messages.order_by("-created_at")[:20])
     history.reverse()
@@ -22,15 +22,18 @@ def build_conversation_history(contact: Contact) -> list:
     data_bank = "\n".join([f"- {item.key}: {item.content}" for item in info_items])
 
     system_prompt = (
-        "You are Uforo, an assistant working for Titus at Automate NG. "
-        "WHO WE ARE: Automate NG specializes in building Custom AI Brains for businesses. "
+        "You are Uforo, the AI Assistant for Titus at Automate NG. "
+        "WHO WE ARE: We build Custom AI Brains for businesses. "
         "OUR DATA BANK:\n"
         f"{data_bank}\n\n"
-        "GUIDELINES:\n"
-        "1. If a user asks for a specific 'Brain' or 'Automation' for their niche (like Real Estate, Legal, or Health), "
-        "DO NOT say we don't offer it. Instead, explain that we build CUSTOM SOLUTIONS for that niche starting at NGN 300,000. "
-        "2. Personality: Professional, warm, and helpful. Use Nigerian business etiquette (respectful but modern). "
-        "3. Focus: Always try to lead the user toward booking a consultation or speaking with a human expert (Titus) for a custom quote."
+        "STRICT OPERATING RULES:\n"
+        "1. NO PLACEHOLDERS: Never use brackets like [Insert Date] or [Time]. If you don't know a detail, don't mention it.\n"
+        "2. NO FAKE LINKS: Never provide Zoom, Google Meet, or Email links. We do not have an automated booking system yet.\n"
+        "3. THE MEETING WORKFLOW: If a user wants a meeting, say: 'I have logged your request. Titus will check his schedule and message you here on WhatsApp shortly to fix a time.'\n"
+        "4. NO LYING: Do not say 'I have sent an email' or 'I checked the calendar'. You cannot do those things. Just say 'I have noted that for Titus'.\n"
+        "5. BE CONCISE: Use maximum 2 short sentences. WhatsApp is for quick chatting, not long emails.\n"
+        "6. PRICING: Stick to the data bank. Custom niche solutions start at NGN 300,000.\n"
+        "7. TONE: Professional, Nigerian, and helpful. Do not be overly 'robotic' or wordy."
     )
 
     messages = [{"role": "system", "content": system_prompt}]
@@ -44,18 +47,34 @@ def get_ai_reply(contact: Contact, message_text: str) -> str:
     Message.objects.create(contact=contact, role="user", content=message_text)
 
     conversation = build_conversation_history(contact)
+    start_time = time.perf_counter()
+    
+    try:
+        client = Groq(api_key=settings.GROQ_API_KEY)
+        response = client.chat.completions.create(
+            model="llama-3.1-8b-instant",
+            messages=conversation,
+        )
+        reply = response.choices[0].message.content
+        status = "sent"
+    except Exception as e:
+        print(f"Groq Error: {e}")
+        reply = "I'm having trouble connecting right now. Please try again later."
+        status = "failed"
 
-    client = Groq(api_key=settings.GROQ_API_KEY)
-    response = client.chat.completions.create(
-        model="llama-3.1-8b-instant",
-        messages=conversation,
+    duration = time.perf_counter() - start_time
+
+    Message.objects.create(
+        contact=contact, 
+        role="assistant", 
+        content=reply,
+        status=status,
+        response_time=round(duration, 2)
     )
 
-    reply = response.choices[0].message.content
-
-    Message.objects.create(contact=contact, role="assistant", content=reply)
-
     return reply
+
+
 
 def send_whatsapp_message(to_number: str, message_text: str) -> requests.Response:    
     url = f"https://graph.facebook.com/v19.0/{settings.WHATSAPP_PHONE_NUMBER_ID}/messages"
