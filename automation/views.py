@@ -50,28 +50,19 @@ class WebhookView(APIView):
 
 
 class EmailWebhookView(APIView):
-    authentication_classes = []
-    permission_classes = [AllowAny]
-
     def post(self, request):
         email = request.data.get("email")
         name = request.data.get("name")
         message_text = request.data.get("message")
 
-        if not email or not message_text:
-            return Response({"error": "Missing data"}, status=400)
-
-        contact, _ = Contact.objects.get_or_create(email=email)
+        contact, created = Contact.objects.get_or_create(email=email)
         if name and not contact.name:
             contact.name = name
             contact.save()
 
         ai_reply = get_ai_reply(contact, message_text)
 
-        send_resend_email(
-            to_email=email,
-            subject=f"Inquiry: {message_text[:30]}...",
-            content=ai_reply
-        )
+        res = send_resend_email(email, f"Re: Inquiry from {name}", ai_reply)
+        print(f"Resend Response: {res.status_code} - {res.text}")
 
         return Response({"status": "Email sent by Zira"})
