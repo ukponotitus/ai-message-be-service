@@ -34,6 +34,7 @@ DEBUG = True
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
     "https://automate-ng-admin.netlify.app",
+    "http://localhost:5173",
 ]
 
 ALLOWED_HOSTS = ["*"]

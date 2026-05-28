@@ -2,12 +2,14 @@ from django.db import models
 
 # Create your models here.
 class Contact(models.Model):
-    phone = models.CharField(max_length=20, unique=True)
+    # Change phone to blank/null=True so email-only users can be saved
+    phone = models.CharField(max_length=20, unique=True, null=True, blank=True)
+    email = models.EmailField(unique=True, null=True, blank=True) # Add this
     name = models.CharField(max_length=100, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return self.name or self.phone
+        return self.name or self.email or self.phone
 
 
 class Message(models.Model):

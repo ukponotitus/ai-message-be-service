@@ -4,7 +4,8 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny
 
-from automation.services import get_ai_reply, get_or_create_contact, send_whatsapp_message
+from automation.models import Contact
+from automation.services import get_ai_reply, get_or_create_contact, send_resend_email, send_whatsapp_message
 
 from .serializers import WebhookPayloadSerializer
 
@@ -45,3 +46,36 @@ class WebhookView(APIView):
             print("Error:", e)
 
         return Response({"status": "received"})
+
+
+
+class EmailWebhookView(APIView):
+    authentication_classes = []
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        email = request.data.get("email")
+        name = request.data.get("name")
+        message_text = request.data.get("message")
+
+        if not email or not message_text:
+            return Response({"error": "Missing data"}, status=400)
+
+        # 1. Get or create contact by email
+        contact, _ = Contact.objects.get_or_create(email=email)
+        if name and not contact.name:
+            contact.name = name
+            contact.save()
+
+        # 2. Get Zira's AI Reply (Reusing your logic!)
+        # This will save the conversation to your Database/Dashboard automatically!
+        ai_reply = get_ai_reply(contact, message_text)
+
+        # 3. Send the delivery via Email
+        send_resend_email(
+            to_email=email,
+            subject=f"Inquiry: {message_text[:30]}...",
+            content=ai_reply
+        )
+
+        return Response({"status": "Email sent by Zira"})

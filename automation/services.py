@@ -4,6 +4,7 @@ from django.conf import settings
 from .models import Contact, Message
 from .models import Contact, Message, CompanyInfo
 import time
+import os
 
 
 
@@ -229,3 +230,33 @@ def send_whatsapp_message(to_number: str, message_text: str) -> requests.Respons
     response = requests.post(url, headers=headers, json=payload)
     
     return response
+
+
+
+def send_resend_email(to_email, subject, content):
+    resend_key = os.getenv("re_bnhYgBhr_Aai7tKfXPXqT1iby3oiBtmge")
+    url = "https://api.resend.com/emails"
+    
+    headers = {
+        "Authorization": f"Bearer {resend_key}",
+        "Content-Type": "application/json",
+    }
+    
+    html_content = f"""
+    <div style="font-family: sans-serif; color: #333; max-width: 600px; border: 1px solid #eee; padding: 20px;">
+        <h2 style="color: #00C853;">Automate NG</h2>
+        <p>{content}</p>
+        <br />
+        <hr />
+        <p style="font-size: 12px; color: #888;">This is an automated reply from Zira, your Automate NG Assistant.</p>
+    </div>
+    """
+
+    payload = {
+        "from": "Zira <onboarding@resend.dev>",
+        "to": [to_email],
+        "subject": subject,
+        "html": html_content
+    }
+    
+    return requests.post(url, json=payload, headers=headers)
