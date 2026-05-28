@@ -66,19 +66,23 @@ class DashboardLogsAPI(APIView):
                 logs.append({
                     "name": contact.name or "Unknown",
                     "phone": contact.phone,
+                    "email": contact.email, # Add this line
                     "message": latest_user_msg.content,
-                    "ai_reply": latest_ai_reply.content if latest_ai_reply else "Waiting for response...",
+                    "ai_reply": latest_ai_reply.content if latest_ai_reply else "Waiting...",
                     "time": latest_user_msg.created_at.strftime("%I:%M %p"),
-                    "status": latest_ai_reply.status if latest_ai_reply else "pending"
+                    "status": latest_ai_reply.status if latest_ai_reply else "sent"
                 })
-
         return Response(logs)
     
+
+from django.db.models import Q
 
 class ConversationDetailAPI(APIView):
     def get(self, request, identifier):
         messages = Message.objects.filter(
-            Q(contact__phone=identifier) | Q(contact__email=identifier)
+            Q(contact__phone=identifier) | 
+            Q(contact__email=identifier) |
+            Q(contact__name=identifier)
         ).order_by('created_at')
         
         serializer_data = [ 
