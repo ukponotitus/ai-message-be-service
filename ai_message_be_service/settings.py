@@ -35,6 +35,8 @@ CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
     "https://automate-ng-admin.netlify.app",
     "http://localhost:5173",
+    "https://automate-ng.netlify.app",
+    "https://ai-message-be-service.vercel.app"
 ]
 
 ALLOWED_HOSTS = ["*"]
@@ -151,5 +153,6 @@ CSRF_TRUSTED_ORIGINS = ['https://*.railway.app', 'https://*.vercel.app']
 STATIC_ROOT = BASE_DIR / "staticfiles"
 STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 APPEND_SLASH = True
-CORS_ALLOW_ALL_ORIGINS = True
+CORS_ALLOW_ALL_ORIGINS = True 
+CORS_ALLOW_CREDENTIALS = True
 
