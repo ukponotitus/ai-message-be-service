@@ -76,11 +76,11 @@ class DashboardLogsAPI(APIView):
     
 
 class ConversationDetailAPI(APIView):
-    def get(self, request, phone, identifier):
-        # messages = Message.objects.filter(contact__phone=phone).order_by('created_at')
+    def get(self, request, identifier):
         messages = Message.objects.filter(
             Q(contact__phone=identifier) | Q(contact__email=identifier)
-        ).order_at('created_at')
+        ).order_by('created_at')
+        
         serializer_data = [ 
             {
                 "role": m.role,
