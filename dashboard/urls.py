@@ -5,6 +5,6 @@ urlpatterns = [
     path('metrics/', DashboardMetricsAPI.as_view()),
     path('analytics/', DashboardAnalyticsAPI.as_view()),
     path('logs/', DashboardLogsAPI.as_view()),
-    path('conversation/<str:phone>/', ConversationDetailAPI.as_view()),
+    path('conversation/<str:identifier>/', ConversationDetailAPI.as_view()),
 
 ]
