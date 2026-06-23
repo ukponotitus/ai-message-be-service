@@ -1,40 +1,52 @@
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from django.db.models import Count, Avg
+from rest_framework.permissions import IsAuthenticated
+from django.db.models import Count, Avg, Max, Q
 from django.utils import timezone
 from datetime import timedelta
 from automation.models import Message, Contact
-from django.db.models import Max
-from django.db.models import Q
+from automation.permissions import HasBusinessAccess, resolve_business_id
 
 
 
 class DashboardMetricsAPI(APIView):
+    permission_classes = [IsAuthenticated, HasBusinessAccess]
+
     def get(self, request):
+        business_id = resolve_business_id(request)
+        if not business_id:
+            return Response({"error": "business_id is required"}, status=400)
+
         today = timezone.now().date()
         yesterday = today - timedelta(days=1)
 
-        msg_today = Message.objects.filter(created_at__date=today).count()
-        msg_yesterday = Message.objects.filter(created_at__date=yesterday).count()
+        msg_today = Message.objects.filter(business_id=business_id, created_at__date=today).count()
+        msg_yesterday = Message.objects.filter(business_id=business_id, created_at__date=yesterday).count()
         
-        avg_res = Message.objects.filter(role="assistant").aggregate(Avg('response_time'))['response_time__avg'] or 0
+        avg_res = Message.objects.filter(business_id=business_id, role="assistant").aggregate(Avg('response_time'))['response_time__avg'] or 0
         
         return Response({
             "messages_today": msg_today,
             "diff_yesterday": msg_today - msg_yesterday,
-            "unique_contacts": Contact.objects.filter(created_at__date__gte=today-timedelta(days=7)).count(),
+            "unique_contacts": Contact.objects.filter(business_id=business_id, created_at__date__gte=today-timedelta(days=7)).count(),
             "avg_response": f"{round(avg_res, 1)}s"
         })
     
 
 class DashboardAnalyticsAPI(APIView):
+    permission_classes = [IsAuthenticated, HasBusinessAccess]
+
     def get(self, request):
-        status_data = Message.objects.filter(role="assistant").values('status').annotate(count=Count('id'))
+        business_id = resolve_business_id(request)
+        if not business_id:
+            return Response({"error": "business_id is required"}, status=400)
+
+        status_data = Message.objects.filter(business_id=business_id, role="assistant").values('status').annotate(count=Count('id'))
         
         keywords = ["Pricing", "How it works", "Setup", "Link", "Custom"]
         top_questions = []
         for word in keywords:
-            count = Message.objects.filter(role="user", content__icontains=word).count()
+            count = Message.objects.filter(business_id=business_id, role="user", content__icontains=word).count()
             top_questions.append({"label": word, "count": count})
 
         return Response({
@@ -44,8 +56,14 @@ class DashboardAnalyticsAPI(APIView):
 
 
 class DashboardLogsAPI(APIView):
+    permission_classes = [IsAuthenticated, HasBusinessAccess]
+
     def get(self, request):
-        recent_contacts = Contact.objects.annotate(
+        business_id = resolve_business_id(request)
+        if not business_id:
+            return Response({"error": "business_id is required"}, status=400)
+
+        recent_contacts = Contact.objects.filter(business_id=business_id).annotate(
             last_msg_time=Max('messages__created_at')
         ).filter(last_msg_time__isnull=False).order_by('-last_msg_time')[:10]
 
@@ -53,11 +71,13 @@ class DashboardLogsAPI(APIView):
 
         for contact in recent_contacts:
             latest_user_msg = Message.objects.filter(
+                business_id=business_id,
                 contact=contact, 
                 role="user"
             ).order_by('-created_at').first()
 
             latest_ai_reply = Message.objects.filter(
+                business_id=business_id,
                 contact=contact, 
                 role="assistant"
             ).order_by('-created_at').first()
@@ -66,7 +86,7 @@ class DashboardLogsAPI(APIView):
                 logs.append({
                     "name": contact.name or "Unknown",
                     "phone": contact.phone,
-                    "email": contact.email, # Add this line
+                    "email": contact.email, 
                     "message": latest_user_msg.content,
                     "ai_reply": latest_ai_reply.content if latest_ai_reply else "Waiting...",
                     "time": latest_user_msg.created_at.strftime("%I:%M %p"),
@@ -78,13 +98,22 @@ class DashboardLogsAPI(APIView):
 from django.db.models import Q
 
 class ConversationDetailAPI(APIView):
+    permission_classes = [IsAuthenticated, HasBusinessAccess]
+
     def get(self, request, identifier):
+        business_id = resolve_business_id(request)
+        if not business_id:
+            return Response({"error": "business_id is required"}, status=400)
+
         messages = Message.objects.filter(
-            Q(contact__phone=identifier) | 
-            Q(contact__email=identifier) |
-            Q(contact__name=identifier)
+            business_id=business_id,
+            contact__in=Contact.objects.filter(
+                Q(phone=identifier) | 
+                Q(email=identifier) |
+                Q(name=identifier)
+            )
         ).order_by('created_at')
-        
+
         serializer_data = [ 
             {
                 "role": m.role,
