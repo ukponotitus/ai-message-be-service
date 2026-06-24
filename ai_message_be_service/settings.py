@@ -32,11 +32,9 @@ SECRET_KEY = 'django-insecure-#zv5g)oh)bp%)3litf(gfe5y&!wi#)e2+0e5y&c58@e45woo3f
 DEBUG = True
 
 CORS_ALLOWED_ORIGINS = [
-    "http://localhost:3000",
-    "https://automate-ng-admin.netlify.app",
     "http://localhost:5173",
     "https://automate-ng.netlify.app",
-    "https://ai-message-be-service.vercel.app"
+    "https://automate-ng-admin.netlify.app",
 ]
 
 ALLOWED_HOSTS = ["*"]
@@ -178,6 +176,6 @@ CSRF_TRUSTED_ORIGINS = ['https://*.railway.app', 'https://*.vercel.app']
 STATIC_ROOT = BASE_DIR / "staticfiles"
 STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 APPEND_SLASH = True
-CORS_ALLOW_ALL_ORIGINS = True 
+CORS_ALLOW_ALL_ORIGINS = False 
 CORS_ALLOW_CREDENTIALS = True
 
