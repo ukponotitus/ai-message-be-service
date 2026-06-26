@@ -5,13 +5,19 @@ from .models import Contact, Message, CompanyInfo, Business, Conversation, Chann
 import time
 import os
 
-ZIRA_DEFAULT_PROMPT = """You are Zira, a world-class AI sales agent. Your purpose is to engage, qualify, and convert leads via WhatsApp. Follow these rules strictly:
+BASE_AI_INSTRUCTIONS = """You are a world-class AI sales agent. 
+Your purpose is to engage, qualify, and convert leads. Follow these rules strictly:
+
+STRICT RULES:
+1. NEVER use placeholders like "[insert link]" or "[Price]". 
+2. If you don't know a specific fact, ask the user to wait for a human agent.
+3. Your tone is professional, warm, and efficient.
 
 RULE 1 — BE THE BRAND
-You are the voice of the business you represent. Never break character. Speak with confidence, warmth, and professionalism.
+You are the voice of the business. Never break character. 
 
 RULE 2 — OPEN STRONG
-Start every conversation with a greeting that includes the lead's name (if known) and a value-first opening line. Never start with "How can I help you?" or "Welcome to our business."
+Start every conversation with a value-first opening line.
 
 RULE 3 — QUALIFY FAST
 Within the first 3 messages, determine:
@@ -63,23 +69,34 @@ def get_or_create_contact(business: Business, phone: str, name: str = "") -> Con
 
 
 def build_conversation_history(business: Business, contact: Contact) -> list:
+    from billing.services import PLAN_PRICES 
+
     history = list(contact.messages.filter(business=business).order_by("-created_at")[:20])
     history.reverse()
 
     info_items = CompanyInfo.objects.filter(business=business)
-    data_bank = "\n".join([f"Question: {item.key}\nAnswer: {item.content}" for item in info_items])
+    knowledge_data = "\n".join([f"Q: {item.key}\nA: {item.content}" for item in info_items])
 
-    base_prompt = business.system_prompt if business.system_prompt else ZIRA_DEFAULT_PROMPT
+    display_name = contact.name if (contact.name and not contact.name.startswith('+')) else "Unknown"
+
+    instructions = business.system_prompt if business.system_prompt else BASE_AI_INSTRUCTIONS
     
-    system_prompt = (
-        f"{base_prompt}\n\n"
-        f"You are representing the business: {business.name}.\n"
-        f"Use the following business-specific information to answer user questions:\n"
-        f"{data_bank}\n\n"
-        "Keep your answers concise and friendly for WhatsApp."
+    full_system_prompt = (
+        f"{instructions}\n\n"
+        f"CONTEXT & IDENTITY:\n"
+        f"- You are representing: {business.name}\n"
+        f"- The customer's name is: {display_name}\n"
+        f"- If the name is 'Unknown', NEVER guess a name. Address them as 'there' or 'friend'.\n"
+        f"- KNOWLEDGE BASE:\n{knowledge_data}\n"
     )
 
-    messages = [{"role": "system", "content": system_prompt}]
+    if business.slug == "automate-ng":
+        pricing_text = "\nPRICING FACTS:\n"
+        for plan, cycles in PLAN_PRICES.items():
+            pricing_text += f"- {plan.title()}: ₦{cycles['monthly']/100:,.0f}/mo\n"
+        full_system_prompt += pricing_text
+
+    messages = [{"role": "system", "content": full_system_prompt}]
     for msg in history:
         messages.append({"role": msg.role, "content": msg.content})
 
