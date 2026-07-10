@@ -97,8 +97,15 @@ def build_conversation_history(business: Business, contact: Contact) -> list:
         full_system_prompt += pricing_text
 
     messages = [{"role": "system", "content": full_system_prompt}]
-    for msg in history:
-        messages.append({"role": msg.role, "content": msg.content})
+    for msg in history:{
+    "operand_a": 2,
+    "operand_b": 8,
+    "student_answer": 8,
+    "response_time_ms": 3000,
+    "session_number": 1,
+    "duration_seconds": 5
+}
+    messages.append({"role": msg.role, "content": msg.content})
 
     return messages
 
@@ -178,20 +185,10 @@ def get_ai_reply(
     return reply
 
 
-def send_whatsapp_message(business: Business, to_number: str, message_text: str) -> requests.Response:
-    url = f"https://graph.facebook.com/v19.0/{business.whatsapp_phone_number_id}/messages"
-    headers = {
-        "Authorization": f"Bearer {business.whatsapp_access_token}",
-        "Content-Type": "application/json",
-    }
-    payload = {
-        "messaging_product": "whatsapp",
-        "to": to_number,
-        "type": "text",
-        "text": {"body": message_text},
-    }
-    return requests.post(url, headers=headers, json=payload)
-
+def send_whatsapp_message(business: Business, to_number: str, message_text: str):
+    from automation.whatsapp.twilio_provider import TwilioWhatsAppProvider
+    provider = TwilioWhatsAppProvider()
+    return provider.send_text_message(to=to_number, body=message_text)
 
 def send_resend_email(to_email, subject, content):
     resend_key = os.getenv("RESEND_API_KEY")

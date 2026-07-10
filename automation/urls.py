@@ -2,7 +2,7 @@ from django.urls import path
 from rest_framework_simplejwt.views import TokenRefreshView
 
 from .views import (
-    EmailWebhookView, WebhookView,
+    EmailWebhookView, TwilioWebhookView, WebhookView,
     ChannelListView, ChannelDetailView, ChannelTestView,
     CompanyInfoListView, CompanyInfoDetailView,
     BusinessOnboardView, BusinessCompanyInfoView,
@@ -52,6 +52,7 @@ urlpatterns = [
     # Webhooks
     path("webhook/", WebhookView.as_view(), name="webhook"),
     path("email-webhook/", EmailWebhookView.as_view()),
+    path("twilio-webhook/", TwilioWebhookView.as_view()),
 
     # Auth
     path("auth/register/", RegisterView.as_view(), name="auth-register"),

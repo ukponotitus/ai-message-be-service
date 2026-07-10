@@ -137,6 +137,72 @@ class EmailWebhookView(APIView):
         return Response({"status": "Email sent by Zira"})
 
 
+class TwilioWebhookView(APIView):
+    authentication_classes = []
+    permission_classes = [AllowAny]
+ 
+    def post(self, request):
+        from automation.whatsapp.twilio_provider import TwilioWhatsAppProvider
+        provider = TwilioWhatsAppProvider()
+ 
+        if not provider.validate_webhook_signature(request):
+            return HttpResponse("Forbidden", status=403)
+ 
+        incoming = provider.parse_incoming_webhook(request)
+        from_number = incoming.from_number
+        to_number = incoming.to_number
+        message_text = incoming.body
+ 
+        if not from_number or not message_text:
+            return Response({"status": "ok"})
+
+        business = Business.objects.filter(
+            whatsapp_phone_number_id=to_number, is_active=True
+        ).first()
+ 
+        if not business:
+            print(f"Received Twilio WhatsApp message for unknown number: {to_number}")
+            return Response({"status": "business not found"}, status=200)
+ 
+        sender_name = "" 
+        contact = get_or_create_contact(business, from_number, sender_name)
+ 
+        channel = ChannelConnection.objects.filter(
+            business=business,
+            channel_type="whatsapp",
+            phone_number_id=to_number,
+        ).first()
+ 
+        conversation, _ = Conversation.objects.get_or_create(
+            business=business,
+            contact=contact,
+            channel=channel,
+            defaults={"status": "active"},
+        )
+ 
+        if not can_business_send_message(business):
+            print(f"Blocking message for {business.name}: No active subscription")
+            return Response({"status": "subscription_required"}, status=200)
+ 
+        if not conversation.is_ai_enabled:
+            print(f"AI disabled for conversation {conversation.id}, logging only")
+            from .models import AnalyticsEvent
+            AnalyticsEvent.objects.create(
+                business=business,
+                event_type="human_handoff",
+                channel=channel,
+                contact=contact,
+                metadata={"note": "AI disabled, manual reply pending", "message": message_text},
+            )
+            return Response({"status": "logged_ai_disabled"}, status=200)
+ 
+        ai_reply = get_ai_reply(business, contact, message_text, conversation, channel)
+ 
+        send_whatsapp_message(business, from_number, ai_reply)
+ 
+        return Response({"status": "received"})
+ 
+
 class BusinessOnboardView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
@@ -233,12 +299,12 @@ class ChannelTestView(APIView):
             business = Business.objects.get(id=business_id)
             test_number = request.data.get("test_number", "")
             try:
-                resp = send_whatsapp_message(business, test_number, "Test message from your channel connection.")
-                success = resp.status_code == 201
+                resp = send_whatsapp_message(business, test_number, "Test message...")
+                success = resp.success
                 return Response({
                     "success": success,
                     "message": "Test message sent" if success else "Failed to send test message",
-                    "status_code": resp.status_code,
+                    "error": resp.error_message if not success else None,
                 })
             except Exception as e:
                 return Response({"success": False, "error": str(e)}, status=500)
